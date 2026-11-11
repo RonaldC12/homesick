@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Homesick</title>
+    <link rel="stylesheet" href="styles/base.css" />
+    <style>
+      body {
+        width: 300px;
+        height: auto;
+        background: linear-gradient(160deg, #18263a, #0b1220 70%);
+      }
+      .pop {
+        padding: 18px 18px 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .head strong {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 18px;
+      }
+      .phase {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: center;
+      }
+      .time {
+        font-size: 54px;
+        font-weight: 200;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+        line-height: 1;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .row select {
+        flex: 1;
+        min-width: 0;
+      }
+      .open {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="pop">
+      <div class="head">
+        <strong>Homesick</strong>
+        <button class="icon-btn" id="sound" title="Sounds on/off" aria-label="Sounds on or off">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10z" /><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /></svg>
+        </button>
+      </div>
+      <div class="phase" id="phase">Ready to lock in</div>
+      <div class="time" id="time">25:00</div>
+      <div class="controls" id="controls"></div>
+      <div class="note" id="note"></div>
+      <div class="row">
+        <select id="place" aria-label="Place"></select>
+      </div>
+      <button class="btn open" id="open">Open Homesick</button>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

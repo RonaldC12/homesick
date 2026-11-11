@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Not right now · Homesick</title>
+    <link rel="icon" href="icons/icon32.png" />
+    <link rel="stylesheet" href="styles/base.css" />
+    <style>
+      .wrap {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .panel {
+        width: min(520px, 94vw);
+        text-align: center;
+        padding: 32px 30px 28px;
+      }
+      .site {
+        display: inline-block;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      h1 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 34px;
+        margin: 0 0 8px;
+      }
+      .left {
+        font-size: 56px;
+        font-weight: 200;
+        font-variant-numeric: tabular-nums;
+        margin: 12px 0 4px;
+      }
+      .why {
+        font-family: var(--serif);
+        font-size: 18px;
+        font-style: italic;
+        margin: 18px 0 0;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        white-space: pre-wrap;
+      }
+      .why small {
+        display: block;
+        font-style: normal;
+        font-family: var(--font);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin-bottom: 6px;
+      }
+      .buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 22px;
+        flex-wrap: wrap;
+      }
+      .breathe {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin: 16px auto 0;
+        animation: breathe 10s ease-in-out infinite;
+      }
+      .breathe-label {
+        font-size: 12px;
+        color: var(--faint);
+        margin-top: 10px;
+      }
+      @keyframes breathe {
+        0%, 100% { transform: scale(1); opacity: 0.55; }
+        40% { transform: scale(2.6); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .breathe { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="vignette"></div>
+    <div class="wrap">
+      <main class="card panel">
+        <span class="site" id="site">This site</span>
+        <h1 id="title">can wait.</h1>
+        <p class="muted" id="message">You're locked in right now.</p>
+        <div class="left" id="left" hidden></div>
+        <div class="breathe" aria-hidden="true"></div>
+        <div class="breathe-label">Breathe in as it grows, out as it shrinks.</div>
+        <p class="why" id="why" hidden></p>
+        <div class="buttons">
+          <button class="btn primary" id="back">Back to focus</button>
+          <a class="btn" id="goAnyway" hidden>Go to the site</a>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="blocked.js"></script>
+  </body>
+</html>
