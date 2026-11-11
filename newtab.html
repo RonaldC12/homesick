@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Homesick</title>
+    <link rel="icon" href="icons/icon32.png" />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/newtab.css" />
+  </head>
+  <body>
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="vignette"></div>
+
+    <div class="layout">
+      <header class="topbar">
+        <div class="clock shadow-text" data-feature="clock">
+          <div class="clock-time" id="homeTime">--:--</div>
+          <div class="clock-sub">
+            <span>Home in Vancouver</span><span id="weather" data-feature="weather"></span>
+          </div>
+          <div class="clock-here" id="hereTime" hidden></div>
+        </div>
+
+        <nav class="actions">
+          <button class="pill" id="placeBtn" title="Choose a place">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 19l6-9 4 6 3-4 5 7z" /><circle cx="17" cy="6" r="2" /></svg>
+            <span id="placeName">Choose a place</span>
+          </button>
+          <button class="icon-btn" id="soundBtn" title="Sounds" aria-label="Sounds">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10z" /><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /></svg>
+          </button>
+          <button class="icon-btn" id="journalBtn" title="Journal" aria-label="Journal" data-feature="journal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M8 8h6M8 12h6" /></svg>
+          </button>
+          <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+          </button>
+        </nav>
+      </header>
+
+      <main class="center">
+        <p class="greeting shadow-text" id="greeting" data-feature="timer"></p>
+        <section class="timer" data-feature="timer" aria-live="polite">
+          <div class="phase shadow-text" id="phaseLabel">Ready to lock in</div>
+          <div class="time shadow-text" id="timeLeft">25:00</div>
+          <div class="progress" aria-hidden="true"><div id="progressBar"></div></div>
+          <div class="controls" id="controls"></div>
+          <div class="block-note shadow-text" id="blockNote"></div>
+        </section>
+        <p class="affirmation shadow-text" id="affirmation" data-feature="affirmation"></p>
+        <section class="why" data-feature="why">
+          <label for="why" class="why-label">Why I'm here</label>
+          <textarea id="why" rows="2" maxlength="400" placeholder="Write the reason you're doing this. You'll see it every time you open a tab."></textarea>
+        </section>
+      </main>
+
+      <footer class="bottom">
+        <div class="col">
+          <section class="card todos" data-feature="todos">
+            <h2>Today's goals <button class="link-btn" id="clearDone" hidden>Clear done</button></h2>
+            <ul id="todoList"></ul>
+            <form id="todoForm" autocomplete="off">
+              <input type="text" id="todoInput" maxlength="140" placeholder="Add a goal and press Enter" />
+            </form>
+          </section>
+        </div>
+
+        <div class="place-credit shadow-text" id="placeCredit"></div>
+
+        <div class="col right">
+          <section class="card countdown" data-feature="countdown">
+            <h2><span id="tripLabel">Trip home</span> <button class="link-btn" id="tripEdit">Edit</button></h2>
+            <div id="tripView">
+              <div class="big" id="tripDays">-</div>
+              <div class="muted" id="tripSub">Set the date of your next trip home.</div>
+            </div>
+            <form id="tripForm" hidden>
+              <input type="text" id="tripLabelInput" maxlength="40" placeholder="Flight home to YVR" aria-label="Trip name" />
+              <div class="row trip-when">
+                <input type="date" id="tripDateInput" aria-label="Departure date" />
+                <input type="time" id="tripTimeInput" aria-label="Departure time" />
+              </div>
+              <small class="muted">Departure time in your local time. Time is optional.</small>
+              <div class="row"><button class="btn small primary" type="submit">Save</button><button class="btn small ghost" type="button" id="tripCancel">Cancel</button></div>
+            </form>
+          </section>
+          <section class="card stats" data-feature="stats">
+            <h2>Focus</h2>
+            <div class="stat-row">
+              <div><div class="big" id="statToday">0m</div><div class="muted">today</div></div>
+              <div><div class="big" id="statSessions">0</div><div class="muted">sessions</div></div>
+              <div><div class="big" id="statStreak">0</div><div class="muted">day streak</div></div>
+            </div>
+            <div class="bars" id="statBars" aria-label="Focus minutes, last 7 days"></div>
+          </section>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Place picker -->
+    <dialog id="placeDialog" class="sheet wide">
+      <header>
+        <h3>Where do you want to be?</h3>
+        <div class="header-right">
+          <div class="segmented" role="radiogroup" aria-label="Art style">
+            <button type="button" role="radio" data-style="smooth">Smooth</button>
+            <button type="button" role="radio" data-style="pixel">Pixel art</button>
+          </div>
+          <button class="icon-btn close" data-close aria-label="Close">×</button>
+        </div>
+      </header>
+      <div class="place-grid" id="placeGrid"></div>
+      <h4>Your photos</h4>
+      <div class="place-grid" id="customGrid"></div>
+      <p class="error" id="photoError" hidden></p>
+      <input type="file" id="photoInput" accept="image/*" hidden />
+    </dialog>
+
+    <!-- Sound mixer -->
+    <dialog id="soundDialog" class="sheet">
+      <header><h3>Sounds</h3><button class="icon-btn close" data-close aria-label="Close">×</button></header>
+      <div class="sound-top">
+        <button class="btn primary" id="playToggle">Play</button>
+        <button class="btn small ghost" id="sceneMix">Use this place's mix</button>
+      </div>
+      <p class="muted sound-status" id="soundStatus" aria-live="polite"></p>
+      <label class="slider"><span>Volume</span><input type="range" id="masterVol" min="0" max="1" step="0.01" /></label>
+      <div id="channelList"></div>
+      <p class="muted small-print">All sounds are generated in your browser. They keep playing when you switch tabs.</p>
+    </dialog>
+
+    <!-- Journal -->
+    <dialog id="journalDialog" class="sheet">
+      <header><h3>Journal</h3><button class="icon-btn close" data-close aria-label="Close">×</button></header>
+      <p class="prompt" id="journalPrompt"></p>
+      <button class="link-btn" id="newPrompt">Different prompt</button>
+      <textarea id="journalText" rows="6" maxlength="5000" placeholder="Write whatever comes up. Nobody else sees this."></textarea>
+      <div class="row end"><button class="btn primary" id="journalSave">Save entry</button></div>
+      <h4 class="muted">Past entries</h4>
+      <ul class="entries" id="journalEntries"></ul>
+    </dialog>
+
+    <!-- Settings -->
+    <dialog id="settingsDialog" class="sheet wide">
+      <header><h3>Settings</h3><button class="icon-btn close" data-close aria-label="Close">×</button></header>
+      <div class="settings-grid">
+        <section>
+          <h4>Show on my new tab</h4>
+          <div id="featureToggles" class="checks"></div>
+          <label class="field"><span>Your name (optional)</span><input type="text" id="nameInput" maxlength="30" /></label>
+        </section>
+
+        <section>
+          <h4>Site blocking</h4>
+          <div class="radios">
+            <label><input type="radio" name="blockMode" value="focus" /> During focus sessions</label>
+            <label><input type="radio" name="blockMode" value="always" /> Always</label>
+            <label><input type="radio" name="blockMode" value="off" /> Off</label>
+          </div>
+          <form id="siteForm" class="row" autocomplete="off">
+            <input type="text" id="siteInput" placeholder="e.g. espn.com" />
+            <button class="btn small primary" type="submit">Block</button>
+          </form>
+          <p class="error" id="siteError" hidden></p>
+          <ul class="sites" id="siteList"></ul>
+          <button class="link-btn" id="resetSites">Restore the default list</button>
+        </section>
+
+        <section>
+          <h4>Focus timer</h4>
+          <div class="nums">
+            <label class="field"><span>Focus (min)</span><input type="number" id="focusMin" min="1" max="180" /></label>
+            <label class="field"><span>Short break</span><input type="number" id="shortBreakMin" min="1" max="60" /></label>
+            <label class="field"><span>Long break</span><input type="number" id="longBreakMin" min="1" max="90" /></label>
+            <label class="field"><span>Long break every</span><input type="number" id="longBreakEvery" min="1" max="12" /></label>
+          </div>
+          <label class="check"><input type="checkbox" id="autoStartBreak" /> Start breaks automatically</label>
+
+          <h4>Scene</h4>
+          <div class="nums">
+            <label class="field"><span>Time of day</span>
+              <select id="timeOfDay">
+                <option value="auto">Match Vancouver right now</option>
+                <option value="day">Day</option>
+                <option value="dusk">Dusk</option>
+                <option value="night">Night</option>
+              </select>
+            </label>
+            <label class="field"><span>Weather</span>
+              <select id="weatherFx">
+                <option value="auto">Match Vancouver right now</option>
+                <option value="rain">Rain</option>
+                <option value="clear">Clear</option>
+                <option value="fog">Fog</option>
+                <option value="snow">Snow</option>
+              </select>
+            </label>
+            <label class="field"><span>Art style</span>
+              <select id="style">
+                <option value="smooth">Smooth</option>
+                <option value="pixel">Pixel art</option>
+              </select>
+            </label>
+            <label class="field"><span>Motion</span>
+              <select id="motion">
+                <option value="on">Full animation</option>
+                <option value="reduced">Reduced (slower, lighter)</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </div>
+      <p class="muted small-print">Everything is stored on this device only. Weather comes from Open-Meteo.</p>
+    </dialog>
+
+    <script type="module" src="newtab.js"></script>
+  </body>
+</html>
