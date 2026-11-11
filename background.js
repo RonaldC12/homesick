@@ -325,6 +325,14 @@ const handlers = {
   'timer:stop': stopTimer,
   'timer:skip': skipPhase,
   'offscreen:ready': async () => (await getState(['audio'])).audio,
+  'audio:status': async () => {
+    if (!(await hasOffscreen())) return { state: 'none' };
+    try {
+      return (await chrome.runtime.sendMessage({ target: 'offscreen', type: 'status' })) ?? { state: 'none' };
+    } catch {
+      return { state: 'none' };
+    }
+  },
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

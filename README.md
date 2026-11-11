@@ -16,15 +16,17 @@ I'm genuinely so burnt out, surely this will help me motivate.
   - Grouse Mountain: the red gondola over snowy firs
 
   By default each scene follows Vancouver's current time of day (day, dusk, or night) and live weather (rain, fog, or snow). You can also set the time of day and weather yourself.
+- **Two art styles.** Smooth, or pixel art (chunky pixels, a dithered palette, and heavier rain). Switch between them at the top of the place picker or in Settings.
+- **Your own photos.** Upload up to 8 pictures of home. Each one gets graded for the time of day, has the weather drawn over it, and turns into pixel art when that style is on.
 - **Real site blocking.** YouTube, Instagram, TikTok, Twitter/X, Reddit, Facebook, Netflix, Twitch, and Pinterest are blocked during focus sessions. You can add your own sites, remove any of them, or choose to block them all the time. Tabs already open on a blocked site get redirected as soon as a session starts.
 - **Focus timer.** A Pomodoro-style timer (25/5 by default, with a long break every 4 sessions). It keeps running in the background and shows the minutes left on the toolbar icon.
-- **Ambient sound.** Rain, ocean, forest, city and SkyTrain, Westminster chimes, and a soft pad, all generated live in your browser. Each place comes with its own mix, and you can adjust every channel. Sound keeps playing when you switch tabs.
+- **Ambient sound.** Rain, ocean, forest, city and SkyTrain, Westminster chimes, and a soft pad, all generated live in your browser. Each place comes with its own mix, and you can adjust every channel. Sound keeps playing when you switch tabs. If Chrome won't let the background page play audio, the tab where you pressed Play plays it instead, and the sound panel tells you which one is playing.
 - **Motivation and homesickness tools.** You can turn each of these on or off in Settings:
   - Vancouver clock and weather, plus your own local time if you're somewhere else
   - A "why I'm here" note, also shown on the blocked page
-  - A daily line of encouragement
+  - A short daily nudge
   - A list of today's goals
-  - A countdown to your next trip home
+  - A countdown to your next flight home. Add the departure time and it counts down in hours and minutes for the last two days.
   - Focus stats: minutes today, sessions completed, your day streak, and a 7-day chart
   - A private journal with prompts for homesick days
 
@@ -70,7 +72,7 @@ To publish on the Chrome Web Store, zip the folder contents (everything except `
 - `tabs`: to move tabs that are already on a blocked site when a session starts
 - `alarms` and `notifications`: so the timer ends on time and tells you, even with no tab open
 - `offscreen`: to play sound in the background
-- `storage`: to save your settings, goals, and journal on this device
+- `storage` and `unlimitedStorage`: to save your settings, goals, journal, and photos on this device
 
 ## Tips
 

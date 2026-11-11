@@ -76,8 +76,12 @@
               <div class="muted" id="tripSub">Set the date of your next trip home.</div>
             </div>
             <form id="tripForm" hidden>
-              <input type="text" id="tripLabelInput" maxlength="40" placeholder="Flight home to YVR" />
-              <input type="date" id="tripDateInput" />
+              <input type="text" id="tripLabelInput" maxlength="40" placeholder="Flight home to YVR" aria-label="Trip name" />
+              <div class="row trip-when">
+                <input type="date" id="tripDateInput" aria-label="Departure date" />
+                <input type="time" id="tripTimeInput" aria-label="Departure time" />
+              </div>
+              <small class="muted">Departure time in your local time. Time is optional.</small>
               <div class="row"><button class="btn small primary" type="submit">Save</button><button class="btn small ghost" type="button" id="tripCancel">Cancel</button></div>
             </form>
           </section>
@@ -96,8 +100,21 @@
 
     <!-- Place picker -->
     <dialog id="placeDialog" class="sheet wide">
-      <header><h3>Where do you want to be?</h3><button class="icon-btn close" data-close aria-label="Close">×</button></header>
+      <header>
+        <h3>Where do you want to be?</h3>
+        <div class="header-right">
+          <div class="segmented" role="radiogroup" aria-label="Art style">
+            <button type="button" role="radio" data-style="smooth">Smooth</button>
+            <button type="button" role="radio" data-style="pixel">Pixel art</button>
+          </div>
+          <button class="icon-btn close" data-close aria-label="Close">×</button>
+        </div>
+      </header>
       <div class="place-grid" id="placeGrid"></div>
+      <h4>Your photos</h4>
+      <div class="place-grid" id="customGrid"></div>
+      <p class="error" id="photoError" hidden></p>
+      <input type="file" id="photoInput" accept="image/*" hidden />
     </dialog>
 
     <!-- Sound mixer -->
@@ -107,6 +124,7 @@
         <button class="btn primary" id="playToggle">Play</button>
         <button class="btn small ghost" id="sceneMix">Use this place's mix</button>
       </div>
+      <p class="muted sound-status" id="soundStatus" aria-live="polite"></p>
       <label class="slider"><span>Volume</span><input type="range" id="masterVol" min="0" max="1" step="0.01" /></label>
       <div id="channelList"></div>
       <p class="muted small-print">All sounds are generated in your browser. They keep playing when you switch tabs.</p>
@@ -176,6 +194,12 @@
                 <option value="clear">Clear</option>
                 <option value="fog">Fog</option>
                 <option value="snow">Snow</option>
+              </select>
+            </label>
+            <label class="field"><span>Art style</span>
+              <select id="style">
+                <option value="smooth">Smooth</option>
+                <option value="pixel">Pixel art</option>
               </select>
             </label>
             <label class="field"><span>Motion</span>

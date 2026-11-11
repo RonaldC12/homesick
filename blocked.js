@@ -1,6 +1,6 @@
 import { getState, formatClock, timerRemainingMs, normalizeSite, deepMerge, DEFAULTS } from './lib/state.js';
 import { mountScene } from './lib/sceneHost.js';
-import { AFFIRMATIONS, dailyPick } from './lib/content.js';
+
 
 const $ = (id) => document.getElementById(id);
 const site = normalizeSite(new URLSearchParams(location.search).get('site') ?? '') ?? '';
@@ -21,8 +21,8 @@ function render() {
   if (blockedNow && listed) {
     $('message').textContent =
       settings.blockMode === 'always' && !focusing
-        ? `You chose to block this all the time. ${dailyPick(AFFIRMATIONS, 3)}`
-        : "You're locked in right now. This will still be here when you're done.";
+        ? 'You set this site to always be blocked. You can change that in Settings.'
+        : "You're in a focus session. It'll still be here when the timer ends.";
     $('left').hidden = !focusing;
     $('goAnyway').hidden = true;
   } else {

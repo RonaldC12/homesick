@@ -1,21 +1,23 @@
 import { getState, setState, updateKey, deepMerge, DEFAULTS, formatClock, timerRemainingMs, sendMessage } from './lib/state.js';
 import { SCENES } from './lib/scenes.js';
-import { SCENE_MIXES } from './lib/audio.js';
+import { mixFor } from './lib/audio.js';
 
 const $ = (id) => document.getElementById(id);
-let { timer, settings, audio } = await getState(['timer', 'settings', 'audio']);
+let { timer, settings, audio, customPlaces } = await getState(['timer', 'settings', 'audio', 'customPlaces']);
 
-for (const s of SCENES) {
+const option = (value, label) => {
   const o = document.createElement('option');
-  o.value = s.id;
-  o.textContent = `${s.name} · ${s.area}`;
-  $('place').append(o);
-}
+  o.value = value;
+  o.textContent = label;
+  return o;
+};
+for (const s of SCENES) $('place').append(option(s.id, `${s.name} · ${s.area}`));
+for (const p of customPlaces) $('place').append(option(`custom:${p.id}`, `${p.name} · Your photo`));
 
 $('place').addEventListener('change', async (e) => {
   const scene = e.target.value;
   await setState({ settings: { ...settings, scene } });
-  await updateKey('audio', (a) => ({ ...a, volumes: { ...SCENE_MIXES[scene] } }));
+  await updateKey('audio', (a) => ({ ...a, volumes: mixFor(scene) }));
 });
 $('sound').addEventListener('click', () => updateKey('audio', (a) => ({ ...a, playing: !a.playing })));
 $('open').addEventListener('click', () => {

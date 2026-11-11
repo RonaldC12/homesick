@@ -14,9 +14,9 @@ import {
   uid,
 } from './lib/state.js';
 import { SCENES, SceneRenderer } from './lib/scenes.js';
-import { mountScene, resolveSceneOptions } from './lib/sceneHost.js';
-import { CHANNELS, SCENE_MIXES } from './lib/audio.js';
-import { AFFIRMATIONS, JOURNAL_PROMPTS, dailyPick, pick } from './lib/content.js';
+import { mountScene, resolveSceneOptions, loadPlaceImage, describeScene } from './lib/sceneHost.js';
+import { AmbientEngine, CHANNELS, mixFor } from './lib/audio.js';
+import { NUDGES, JOURNAL_PROMPTS, dailyPick, pick } from './lib/content.js';
 import { getWeather } from './lib/weather.js';
 
 const $ = (id) => document.getElementById(id);
@@ -26,7 +26,7 @@ const FEATURE_LABELS = {
   weather: 'Vancouver weather',
   timer: 'Focus timer',
   why: "\"Why I'm here\" note",
-  affirmation: 'Daily encouragement',
+  affirmation: 'Daily nudge',
   todos: "Today's goals",
   countdown: 'Countdown to home',
   stats: 'Focus stats and streak',
@@ -42,9 +42,9 @@ let state = await getState();
 await mountScene($('scene'));
 
 function renderPlace() {
-  const scene = SCENES.find((s) => s.id === state.settings.scene) ?? SCENES[0];
-  $('placeName').textContent = scene.name;
-  $('placeCredit').textContent = `${scene.name} · ${scene.area}`;
+  const { name, area } = describeScene(state.settings.scene, state.customPlaces);
+  $('placeName').textContent = name;
+  $('placeCredit').textContent = `${name} · ${area}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ function renderTimerTick() {
 // Affirmation and "why"
 // ---------------------------------------------------------------------------
 
-$('affirmation').textContent = dailyPick(AFFIRMATIONS);
+$('affirmation').textContent = dailyPick(NUDGES);
 
 const whyEl = $('why');
 function renderWhy() {
@@ -218,36 +218,54 @@ $('clearDone').addEventListener('click', () => updateKey('todos', (todos) => tod
 // Countdown
 // ---------------------------------------------------------------------------
 
-function parseLocalDate(s) {
+function parseLocalDate(s, time = '') {
   const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
+  const [hh, mm] = time ? time.split(':').map(Number) : [0, 0];
+  return new Date(y, m - 1, d, hh || 0, mm || 0);
 }
 
 function renderCountdown() {
-  const { tripDate, tripLabel } = state.settings;
+  const { tripDate, tripTime, tripLabel } = state.settings;
   $('tripLabel').textContent = tripLabel || 'Trip home';
   if (!tripDate) {
     $('tripDays').textContent = '—';
-    $('tripSub').textContent = 'Set the date of your next trip home.';
+    $('tripSub').textContent = 'Add the date and time of your next flight home.';
     return;
   }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = parseLocalDate(tripDate);
-  const days = Math.round((target - today) / 86_400_000);
+  const now = new Date();
+  const target = parseLocalDate(tripDate, tripTime);
   const dateStr = target.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-  if (days > 1) {
+  const timeStr = tripTime ? target.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+  const when = timeStr ? `${dateStr} at ${timeStr}` : dateStr;
+
+  // Whole calendar days, for the far-off view
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const targetDay = new Date(target);
+  targetDay.setHours(0, 0, 0, 0);
+  const days = Math.round((targetDay - today) / 86_400_000);
+  const msLeft = target - now;
+
+  if (days >= 2) {
     $('tripDays').textContent = `${days} days`;
-    $('tripSub').textContent = `until ${dateStr}. You've got this.`;
-  } else if (days === 1) {
-    $('tripDays').textContent = 'Tomorrow';
-    $('tripSub').textContent = `${dateStr}. Pack your rain jacket.`;
-  } else if (days === 0) {
-    $('tripDays').textContent = 'Today';
-    $('tripSub').textContent = 'Safe travels home.';
+    $('tripSub').textContent = when;
+  } else if (tripTime && msLeft > 0) {
+    // Under two days with a known time: count down hours and minutes
+    const totalMin = Math.ceil(msLeft / 60000);
+    const d = Math.floor(totalMin / 1440);
+    const h = Math.floor((totalMin % 1440) / 60);
+    const m = totalMin % 60;
+    $('tripDays').textContent = [d ? `${d}d` : '', h || d ? `${h}h` : '', `${m}m`].filter(Boolean).join(' ');
+    $('tripSub').textContent = `${days === 0 ? 'Today' : 'Tomorrow'} at ${timeStr}`;
+  } else if (!tripTime && days >= 0) {
+    $('tripDays').textContent = days === 1 ? 'Tomorrow' : 'Today';
+    $('tripSub').textContent = when;
+  } else if (tripTime && msLeft > -12 * 3_600_000) {
+    $('tripDays').textContent = 'Departed';
+    $('tripSub').textContent = 'Have a good flight. Say hi to the mountains.';
   } else {
     $('tripDays').textContent = 'Welcome back';
-    $('tripSub').textContent = 'Hope home was good. Set the next trip when you know it.';
+    $('tripSub').textContent = 'Add your next trip when you know it.';
   }
 }
 
@@ -258,6 +276,7 @@ function toggleTripForm(show) {
   if (show) {
     $('tripLabelInput').value = state.settings.tripLabel;
     $('tripDateInput').value = state.settings.tripDate;
+    $('tripTimeInput').value = state.settings.tripTime;
     $('tripDateInput').focus();
   }
 }
@@ -269,6 +288,7 @@ $('tripForm').addEventListener('submit', async (e) => {
   await saveSettings({
     tripLabel: $('tripLabelInput').value.trim() || DEFAULTS.settings.tripLabel,
     tripDate: $('tripDateInput').value,
+    tripTime: $('tripDateInput').value ? $('tripTimeInput').value : '',
   });
   toggleTripForm(false);
 });
@@ -320,46 +340,142 @@ document.querySelectorAll('dialog').forEach((d) => {
 });
 
 // ---- Place picker
-let thumbs = [];
-$('placeBtn').addEventListener('click', () => {
-  const grid = $('placeGrid');
-  if (!grid.childElementCount) {
-    const opts = resolveSceneOptions(state.settings, state.weatherCache);
-    for (const s of SCENES) {
-      const btn = document.createElement('button');
-      btn.className = 'place';
-      btn.dataset.id = s.id;
-      const canvas = document.createElement('canvas');
-      canvas.width = 300;
-      canvas.height = 150;
-      const info = document.createElement('div');
-      const name = document.createElement('strong');
-      name.textContent = s.name;
-      const area = document.createElement('em');
-      area.textContent = s.area;
-      const blurb = document.createElement('p');
-      blurb.textContent = s.blurb;
-      info.append(name, area, blurb);
-      btn.append(canvas, info);
-      btn.addEventListener('click', () => choosePlace(s.id));
-      grid.append(btn);
-      thumbs.push({ id: s.id, canvas });
-    }
-    $('placeDialog').showModal();
-    // Draw after the dialog is laid out so canvases have a size
-    requestAnimationFrame(() => {
-      for (const t of thumbs) new SceneRenderer(t.canvas, { ...opts, scene: t.id, still: true });
-    });
-  } else {
-    $('placeDialog').showModal();
+const MAX_PHOTOS = 8;
+
+function placeCard({ id, name, area, blurb, image }, opts, onRemove) {
+  const card = document.createElement('div');
+  card.className = 'place';
+  card.dataset.id = id;
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', `Go to ${name}`);
+  const canvas = document.createElement('canvas');
+  canvas.width = 300;
+  canvas.height = 150;
+  const info = document.createElement('div');
+  const title = document.createElement('strong');
+  title.textContent = name;
+  const sub = document.createElement('em');
+  sub.textContent = area;
+  info.append(title, sub);
+  if (blurb) {
+    const p = document.createElement('p');
+    p.textContent = blurb;
+    info.append(p);
   }
-  grid.querySelectorAll('.place').forEach((b) => b.classList.toggle('selected', b.dataset.id === state.settings.scene));
+  if (onRemove) {
+    const rm = document.createElement('button');
+    rm.className = 'link-btn remove';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onRemove();
+    });
+    info.append(rm);
+  }
+  card.append(canvas, info);
+  card.addEventListener('click', () => choosePlace(id));
+  card.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      choosePlace(id);
+    }
+  });
+  card.classList.toggle('selected', id === state.settings.scene);
+  // Draw after layout so the canvas has a size
+  requestAnimationFrame(() => new SceneRenderer(canvas, { ...opts, scene: id, image, still: true }));
+  return card;
+}
+
+async function renderPlaceDialog() {
+  const opts = resolveSceneOptions(state.settings, state.weatherCache);
+  document.querySelectorAll('.segmented [data-style]').forEach((b) =>
+    b.setAttribute('aria-checked', String(b.dataset.style === opts.style)),
+  );
+
+  const grid = $('placeGrid');
+  grid.replaceChildren(...SCENES.map((s) => placeCard({ ...s, image: null }, opts)));
+
+  const custom = $('customGrid');
+  const cards = [];
+  for (const place of state.customPlaces) {
+    const image = await loadPlaceImage(place).catch(() => null);
+    if (!image) continue;
+    cards.push(
+      placeCard({ id: `custom:${place.id}`, name: place.name, area: 'Your photo', image }, opts, () =>
+        removePhoto(place),
+      ),
+    );
+  }
+  if (state.customPlaces.length < MAX_PHOTOS) {
+    const add = document.createElement('button');
+    add.className = 'place add-photo';
+    add.innerHTML =
+      '<span class="plus" aria-hidden="true">+</span><strong>Add your own photo</strong>' +
+      '<p>Any picture of home. It gets the same weather, time of day, and art style.</p>';
+    add.addEventListener('click', () => $('photoInput').click());
+    cards.push(add);
+  }
+  custom.replaceChildren(...cards);
+}
+
+$('placeBtn').addEventListener('click', () => {
+  $('photoError').hidden = true;
+  $('placeDialog').showModal();
+  renderPlaceDialog();
 });
+
+document.querySelectorAll('.segmented [data-style]').forEach((b) =>
+  b.addEventListener('click', () => saveSettings({ style: b.dataset.style })),
+);
 
 async function choosePlace(id) {
   await saveSettings({ scene: id });
-  await updateKey('audio', (a) => ({ ...a, volumes: { ...SCENE_MIXES[id] } }));
+  await updateKey('audio', (a) => ({ ...a, volumes: mixFor(id) }));
   $('placeDialog').close();
+}
+
+function photoError(msg) {
+  $('photoError').textContent = msg;
+  $('photoError').hidden = false;
+}
+
+/** Shrink the photo so it fits comfortably in storage, then save it as a place. */
+async function addPhoto(file) {
+  $('photoError').hidden = true;
+  if (!file.type.startsWith('image/')) return photoError("That file isn't an image.");
+  let bmp;
+  try {
+    bmp = await createImageBitmap(file);
+  } catch {
+    return photoError("Couldn't read that image. Try a JPG or PNG.");
+  }
+  const scale = Math.min(1, 1920 / bmp.width, 1200 / bmp.height);
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
+  const dataUrl = c.toDataURL('image/jpeg', 0.86);
+
+  const suggested = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 40) || 'Home';
+  const name = (prompt('What should this place be called?', suggested) ?? '').trim().slice(0, 40);
+  if (!name) return;
+  const id = uid();
+  await updateKey('customPlaces', (list) => [...list, { id, name, dataUrl, created: Date.now() }]);
+  await choosePlace(`custom:${id}`);
+}
+
+$('photoInput').addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (file) addPhoto(file);
+});
+
+async function removePhoto(place) {
+  if (!confirm(`Remove "${place.name}"?`)) return;
+  if (state.settings.scene === `custom:${place.id}`) await saveSettings({ scene: 'seawall' });
+  await updateKey('customPlaces', (list) => list.filter((p) => p.id !== place.id));
 }
 
 // ---- Sound
@@ -396,13 +512,49 @@ function renderSound() {
   });
 }
 
-$('soundBtn').addEventListener('click', () => $('soundDialog').showModal());
-$('playToggle').addEventListener('click', () => updateKey('audio', (a) => ({ ...a, playing: !a.playing })));
+// Sound normally plays from a hidden offscreen document so it survives tab switches.
+// If Chrome doesn't let that document start audio, this tab plays it instead.
+let localEngine = null;
+
+async function checkAudio() {
+  if (!state.audio.playing || localEngine) return;
+  const res = await sendMessage({ type: 'audio:status' });
+  if (res?.result?.state === 'running') {
+    $('soundStatus').textContent = 'Playing. Sound keeps going when you switch tabs.';
+    return;
+  }
+  localEngine = new AmbientEngine();
+  localEngine.apply(state.audio);
+  $('soundStatus').textContent = 'Playing from this tab. Keep this tab open for sound.';
+}
+
+function syncLocalAudio() {
+  if (!localEngine) return;
+  if (state.audio.playing) localEngine.apply(state.audio);
+  else {
+    localEngine.stop();
+    localEngine = null;
+  }
+}
+
+$('soundBtn').addEventListener('click', () => {
+  $('soundDialog').showModal();
+  checkAudio();
+});
+$('playToggle').addEventListener('click', async () => {
+  const next = await updateKey('audio', (a) => ({ ...a, playing: !a.playing }));
+  if (next.playing) {
+    $('soundStatus').textContent = 'Starting…';
+    setTimeout(checkAudio, 1200);
+  } else {
+    $('soundStatus').textContent = '';
+  }
+});
 $('masterVol').addEventListener('input', (e) =>
   updateKey('audio', (a) => ({ ...a, master: Number(e.target.value) })),
 );
 $('sceneMix').addEventListener('click', () =>
-  updateKey('audio', (a) => ({ ...a, volumes: { ...SCENE_MIXES[state.settings.scene] } })),
+  updateKey('audio', (a) => ({ ...a, volumes: mixFor(state.settings.scene) })),
 );
 
 // ---- Journal
@@ -495,6 +647,7 @@ function renderSettings() {
   $('timeOfDay').value = s.timeOfDay;
   $('weatherFx').value = s.weatherFx;
   $('motion').value = s.motion;
+  $('style').value = s.style;
   if (document.activeElement !== $('nameInput')) $('nameInput').value = s.name;
 
   const list = $('siteList');
@@ -531,7 +684,7 @@ for (const id of ['focusMin', 'shortBreakMin', 'longBreakMin', 'longBreakEvery']
   });
 }
 $('autoStartBreak').addEventListener('change', (e) => saveSettings({ autoStartBreak: e.target.checked }));
-for (const id of ['timeOfDay', 'weatherFx', 'motion']) {
+for (const id of ['timeOfDay', 'weatherFx', 'motion', 'style']) {
   $(id).addEventListener('change', (e) => saveSettings({ [id]: e.target.value }));
 }
 $('nameInput').addEventListener('change', (e) => saveSettings({ name: e.target.value.trim() }));
@@ -594,8 +747,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.why) renderWhy();
   if (changes.todos) renderTodos();
   if (changes.stats) renderStats();
-  if (changes.audio) renderSound();
+  if (changes.audio) {
+    renderSound();
+    syncLocalAudio();
+  }
   if (changes.journal && $('journalDialog').open) renderJournal();
+  if (changes.customPlaces) renderPlace();
+  if ((changes.customPlaces || changes.settings) && $('placeDialog').open) renderPlaceDialog();
   if (changes.weatherCache) renderWeather();
 });
 
