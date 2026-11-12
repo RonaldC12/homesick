@@ -15,22 +15,23 @@ I'm genuinely so burnt out, surely this will help me motivate.
   - Gastown: cobblestones, warm windows, and a steam clock that shows the real Vancouver time
   - Grouse Mountain: the red gondola over snowy firs
 
-  By default each scene follows Vancouver's current time of day (day, dusk, or night) and live weather (rain, fog, or snow). You can also set the time of day and weather yourself.
+  By default each scene follows the current time of day (day, dusk, or night) and live weather (rain, fog, or snow) where home is. You can also pick the time of day from the top of the place picker, or set it and the weather in Settings.
+- **Music player.** Paste a Spotify, SoundCloud, or Apple Music link and the player sits in the bottom-left corner, where you can see the playlist, skip tracks, and pause. **Pop out** moves it into a small separate window, so music keeps playing while you work in other tabs.
 - **Two art styles.** Smooth, or pixel art (chunky pixels, a dithered palette, and heavier rain). Switch between them at the top of the place picker or in Settings.
 - **Your own photos.** Upload up to 8 pictures of home. Each one gets graded for the time of day, has the weather drawn over it, and turns into pixel art when that style is on.
 - **Real site blocking.** YouTube, Instagram, TikTok, Twitter/X, Reddit, Facebook, Netflix, Twitch, and Pinterest are blocked during focus sessions. You can add your own sites, remove any of them, or choose to block them all the time. Tabs already open on a blocked site get redirected as soon as a session starts.
-- **Focus timer.** A Pomodoro-style timer (25/5 by default, with a long break every 4 sessions). It keeps running in the background and shows the minutes left on the toolbar icon.
-- **Ambient sound.** Rain, ocean, forest, city and SkyTrain, Westminster chimes, and a soft pad, all generated live in your browser. Each place comes with its own mix, and you can adjust every channel. Sound keeps playing when you switch tabs. If Chrome won't let the background page play audio, the tab where you pressed Play plays it instead, and the sound panel tells you which one is playing.
+- **Focus timer.** A Pomodoro-style timer (25/5 by default, with a long break every 4 sessions). It keeps running in the background and shows the minutes left on the toolbar icon. Click the big numbers to type a new time, like `45`, `12:30`, or `1h30`. Before you start, that sets how long the session is. During a session, it changes the time left.
+- **Ambient sound.** Soft rain, slow ocean waves, wind in the trees, a distant city, occasional gentle chimes, and a warm pad, all generated live in your browser. The sounds are kept low and smooth, with nothing sudden, so they stay in the background while you study. Each place comes with its own mix, and you can adjust every channel. Sound keeps playing when you switch tabs. If Chrome won't let the background page play audio, the tab where you pressed Play plays it instead, and the sound panel tells you which one is playing.
 - **Motivation and homesickness tools.** You can turn each of these on or off in Settings:
-  - Vancouver clock and weather, plus your own local time if you're somewhere else
+  - A clock and weather for home, plus your own local time if it's different. Home defaults to Vancouver. Click the clock to pick any city.
   - A "why I'm here" note, also shown on the blocked page
   - A short daily nudge
   - A list of today's goals
-  - A countdown to your next flight home. Add the departure time and it counts down in hours and minutes for the last two days.
+  - A "Return home" countdown. Add a time and it counts down in hours and minutes for the last two days.
   - Focus stats: minutes today, sessions completed, your day streak, and a 7-day chart
   - A private journal with prompts for homesick days
 
-Everything is stored on your device with `chrome.storage.local`. The only network request is the weather lookup from [Open-Meteo](https://open-meteo.com/), which needs no account or API key.
+Everything is stored on your device with `chrome.storage.local`. The only network requests are the weather and city lookups from [Open-Meteo](https://open-meteo.com/), which need no account or API key, plus whichever music player you add.
 
 ## Install it (about one minute)
 
@@ -59,6 +60,8 @@ To publish on the Chrome Web Store, zip the folder contents (everything except `
 | `newtab.html/js` | The main focus page |
 | `blocked.html/js` | The page you land on when you open a blocked site |
 | `popup.html/js` | The toolbar popup |
+| `player.html/js` | The pop-out music window |
+| `lib/music.js` | Turns Spotify, SoundCloud, and Apple Music links into embeds |
 | `offscreen.html/js` | Hidden page that plays ambient audio so it keeps going across tabs |
 | `lib/scenes.js` | Canvas renderer and all seven animated scenes |
 | `lib/audio.js` | Web Audio synthesis for every soundscape |
@@ -73,6 +76,11 @@ To publish on the Chrome Web Store, zip the folder contents (everything except `
 - `alarms` and `notifications`: so the timer ends on time and tells you, even with no tab open
 - `offscreen`: to play sound in the background
 - `storage` and `unlimitedStorage`: to save your settings, goals, journal, and photos on this device
+
+### Music player notes
+
+- Spotify plays full songs only if you're logged in to Spotify in Chrome. Otherwise it plays 30-second previews. Apple Music works the same way.
+- The player in the corner stops when you leave the new tab page. Use **Pop out** if you want music while you work in other tabs.
 
 ## Tips
 

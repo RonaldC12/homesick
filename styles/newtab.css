@@ -718,7 +718,184 @@ dialog section > h4:first-child {
   .bottom .col {
     width: 100%;
   }
+  .card.music {
+    position: static;
+  }
   .place-credit {
     order: 3;
+  }
+}
+
+/* ---------- Clickable home clock ---------- */
+button.clock {
+  display: block;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+button.clock > span {
+  display: block;
+}
+
+button.clock > .clock-sub {
+  display: flex;
+}
+
+button.clock:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+button.clock:hover .clock-sub #homeLabel {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.city-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.city-list button {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.city-list button:hover {
+  border-color: var(--accent);
+}
+
+.city-list span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+#homeForm input {
+  flex: 1;
+}
+
+.home-row {
+  justify-content: space-between;
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ---------- Editable timer ---------- */
+.time-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+button.time {
+  background: none;
+  border: 0;
+  padding: 0 12px;
+  border-radius: 16px;
+  cursor: text;
+  font-family: inherit;
+  color: inherit;
+}
+
+button.time:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+input.time {
+  width: 6.2ch;
+  text-align: center;
+  background: rgba(10, 16, 26, 0.35);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  padding: 0;
+  font-family: inherit;
+}
+
+.time-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.time-hint.error-text {
+  color: var(--danger);
+}
+
+/* ---------- Music card ---------- */
+.bottom .col.left {
+  position: relative;
+}
+
+/* Sits above the goals card and grows upward, so a tall player
+   doesn't push the timer around. */
+.card.music {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 12px);
+  padding: 12px 14px 14px;
+}
+
+.card.music h2 {
+  margin-bottom: 8px;
+}
+
+.card.music.collapsed h2 {
+  margin-bottom: 0;
+}
+
+.music-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.card.music iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.card.music iframe.tucked {
+  position: absolute;
+  width: 1px;
+  height: 1px !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.music-form .row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.music-form .hint,
+.music-form .error,
+.card.music .popped {
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+.card.music .popped .link-btn {
+  font-size: 12px;
+}
+
+@media (max-width: 1180px) {
+  .card.music {
+    position: static;
   }
 }

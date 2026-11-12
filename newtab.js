@@ -1,5 +1,6 @@
 import {
   DEFAULTS,
+  OLD_TRIP_LABELS,
   DEFAULT_BLOCKED_SITES,
   deepMerge,
   getState,
@@ -10,6 +11,7 @@ import {
   normalizeSite,
   formatClock,
   timerRemainingMs,
+  parseDuration,
   sendMessage,
   uid,
 } from './lib/state.js';
@@ -17,13 +19,14 @@ import { SCENES, SceneRenderer } from './lib/scenes.js';
 import { mountScene, resolveSceneOptions, loadPlaceImage, describeScene } from './lib/sceneHost.js';
 import { AmbientEngine, CHANNELS, mixFor } from './lib/audio.js';
 import { NUDGES, JOURNAL_PROMPTS, dailyPick, pick } from './lib/content.js';
-import { getWeather } from './lib/weather.js';
+import { getWeather, searchCities } from './lib/weather.js';
+import { musicEmbed, musicFrame } from './lib/music.js';
 
 const $ = (id) => document.getElementById(id);
 
 const FEATURE_LABELS = {
-  clock: 'Vancouver clock',
-  weather: 'Vancouver weather',
+  clock: 'Clock for home',
+  weather: 'Weather at home',
   timer: 'Focus timer',
   why: "\"Why I'm here\" note",
   affirmation: 'Daily nudge',
@@ -31,9 +34,16 @@ const FEATURE_LABELS = {
   countdown: 'Countdown to home',
   stats: 'Focus stats and streak',
   journal: 'Journal',
+  music: 'Music player',
 };
 
 let state = await getState();
+
+// The trip card used to say "Flight home to YVR". Anyone who never renamed it gets "Return home".
+if (OLD_TRIP_LABELS.includes(state.settings.tripLabel)) {
+  state.settings = { ...state.settings, tripLabel: DEFAULTS.settings.tripLabel };
+  await setState({ settings: state.settings });
+}
 
 // ---------------------------------------------------------------------------
 // Scene
@@ -62,20 +72,26 @@ function renderFeatures() {
 // Clock, weather, greeting
 // ---------------------------------------------------------------------------
 
-const homeFmt = new Intl.DateTimeFormat(undefined, {
-  timeZone: 'America/Vancouver',
-  hour: 'numeric',
-  minute: '2-digit',
-});
 const hereFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const awayFromHome = localTz !== 'America/Vancouver' && localTz !== 'America/Los_Angeles';
+
+function timeIn(tz, now) {
+  try {
+    return new Intl.DateTimeFormat(undefined, { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(now);
+  } catch {
+    return hereFmt.format(now);
+  }
+}
 
 function renderClock() {
   const now = new Date();
-  $('homeTime').textContent = homeFmt.format(now);
-  $('hereTime').hidden = !awayFromHome;
-  if (awayFromHome) $('hereTime').textContent = `${hereFmt.format(now)} where you are`;
+  const home = state.settings.home;
+  $('homeTime').textContent = timeIn(home.tz, now);
+  $('homeLabel').textContent = `Home in ${home.name}`;
+  // Only show "where you are" when it's actually a different time there
+  const away = timeIn(home.tz, now) !== hereFmt.format(now) && home.tz !== localTz;
+  $('hereTime').hidden = !away;
+  if (away) $('hereTime').textContent = `${hereFmt.format(now)} where you are`;
 }
 
 async function renderWeather() {
@@ -143,6 +159,8 @@ function renderTimerTick() {
   const el = document.querySelector('.timer');
   const remaining = timer.phase === 'idle' ? settings.focusMin * 60000 : timerRemainingMs(timer);
   $('timeLeft').textContent = formatClock(remaining);
+  $('timeLeft').title =
+    timer.phase === 'idle' ? 'Click to set how long to focus' : 'Click to change the time left';
   el.classList.toggle('running', timer.phase !== 'idle' && !timer.paused);
   el.classList.toggle('paused', timer.paused);
   el.classList.toggle('break', timer.phase === 'break');
@@ -157,6 +175,51 @@ function renderTimerTick() {
   $('phaseLabel').textContent = label;
   document.title = timer.phase === 'idle' ? 'Homesick' : `${formatClock(remaining)} · ${label}`;
 }
+
+// ---- Click the big numbers to type a new time
+function openTimeEditor() {
+  const input = $('timeInput');
+  input.value = $('timeLeft').textContent;
+  $('timeLeft').hidden = true;
+  input.hidden = false;
+  $('timeHint').hidden = false;
+  $('timeHint').classList.remove('error-text');
+  input.focus();
+  input.select();
+}
+
+function closeTimeEditor() {
+  $('timeInput').hidden = true;
+  $('timeHint').hidden = true;
+  $('timeLeft').hidden = false;
+}
+
+async function commitTimeEditor() {
+  const ms = parseDuration($('timeInput').value);
+  if (ms === null) {
+    $('timeHint').textContent = "Couldn't read that. Try 25, 45:00, or 1h30.";
+    $('timeHint').classList.add('error-text');
+    $('timeInput').select();
+    return;
+  }
+  $('timeHint').textContent = 'Type minutes (45), mm:ss (12:30), or 1h30, then press Enter';
+  closeTimeEditor();
+  await sendMessage({ type: 'timer:set', ms });
+}
+
+$('timeLeft').addEventListener('click', openTimeEditor);
+$('timeInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitTimeEditor();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeTimeEditor();
+  }
+});
+$('timeInput').addEventListener('blur', () => {
+  if (!$('timeInput').hidden) closeTimeEditor();
+});
 
 // ---------------------------------------------------------------------------
 // Affirmation and "why"
@@ -229,7 +292,7 @@ function renderCountdown() {
   $('tripLabel').textContent = tripLabel || 'Trip home';
   if (!tripDate) {
     $('tripDays').textContent = '—';
-    $('tripSub').textContent = 'Add the date and time of your next flight home.';
+    $('tripSub').textContent = "Add the date you're going home.";
     return;
   }
   const now = new Date();
@@ -261,8 +324,8 @@ function renderCountdown() {
     $('tripDays').textContent = days === 1 ? 'Tomorrow' : 'Today';
     $('tripSub').textContent = when;
   } else if (tripTime && msLeft > -12 * 3_600_000) {
-    $('tripDays').textContent = 'Departed';
-    $('tripSub').textContent = 'Have a good flight. Say hi to the mountains.';
+    $('tripDays').textContent = 'Going home';
+    $('tripSub').textContent = 'Safe travels.';
   } else {
     $('tripDays').textContent = 'Welcome back';
     $('tripSub').textContent = 'Add your next trip when you know it.';
@@ -392,6 +455,9 @@ async function renderPlaceDialog() {
   document.querySelectorAll('.segmented [data-style]').forEach((b) =>
     b.setAttribute('aria-checked', String(b.dataset.style === opts.style)),
   );
+  document.querySelectorAll('.segmented [data-tod]').forEach((b) =>
+    b.setAttribute('aria-checked', String(b.dataset.tod === state.settings.timeOfDay)),
+  );
 
   const grid = $('placeGrid');
   grid.replaceChildren(...SCENES.map((s) => placeCard({ ...s, image: null }, opts)));
@@ -477,6 +543,188 @@ async function removePhoto(place) {
   if (state.settings.scene === `custom:${place.id}`) await saveSettings({ scene: 'seawall' });
   await updateKey('customPlaces', (list) => list.filter((p) => p.id !== place.id));
 }
+
+// ---- Home location
+function openHomeDialog() {
+  const h = state.settings.home;
+  $('homeCurrent').textContent = `${h.name} (${h.tz.replace(/_/g, ' ')})`;
+  $('homeResults').replaceChildren();
+  $('homeStatus').textContent = '';
+  $('homeInput').value = '';
+  $('homeDialog').showModal();
+  $('homeInput').focus();
+}
+
+$('homeBtn').addEventListener('click', openHomeDialog);
+
+$('homeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = $('homeInput').value.trim();
+  if (q.length < 2) return;
+  $('homeStatus').textContent = 'Searching…';
+  $('homeResults').replaceChildren();
+  let results;
+  try {
+    results = await searchCities(q);
+  } catch {
+    $('homeStatus').textContent = "Couldn't search right now. Check your connection and try again.";
+    return;
+  }
+  $('homeStatus').textContent = results.length ? 'Pick one:' : 'No cities found. Try a different spelling.';
+  $('homeResults').replaceChildren(
+    ...results.map((r) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      const name = document.createElement('strong');
+      name.textContent = r.name;
+      const detail = document.createElement('span');
+      detail.textContent = `${r.detail ? `${r.detail} · ` : ''}${timeIn(r.tz, new Date())}`;
+      b.append(name, detail);
+      b.addEventListener('click', async () => {
+        await saveSettings({ home: { name: r.name, lat: r.lat, lon: r.lon, tz: r.tz } });
+        $('homeDialog').close();
+      });
+      li.append(b);
+      return li;
+    }),
+  );
+});
+
+// ---- Music player
+let musicSrcShown = null;
+
+function musicAction(label, title, onClick) {
+  const b = document.createElement('button');
+  b.className = 'link-btn';
+  b.type = 'button';
+  b.textContent = label;
+  b.title = title;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+const setMusic = (patch) => updateKey('music', (m) => ({ ...m, ...patch }));
+
+function musicSetupForm(prefill = '') {
+  const form = document.createElement('form');
+  form.className = 'music-form';
+  form.autocomplete = 'off';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Paste a playlist link';
+  input.setAttribute('aria-label', 'Music link');
+  input.value = prefill;
+  const err = document.createElement('p');
+  err.className = 'error';
+  err.hidden = true;
+  const hint = document.createElement('p');
+  hint.className = 'muted hint';
+  hint.textContent = 'In the app, open a playlist and use Share, then Copy link. Spotify, SoundCloud, and Apple Music work.';
+  const row = document.createElement('div');
+  row.className = 'row';
+  const save = document.createElement('button');
+  save.className = 'btn small primary';
+  save.type = 'submit';
+  save.textContent = 'Add';
+  row.append(input, save);
+  form.append(row, err, hint);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const embed = musicEmbed(input.value);
+    if (embed.error) {
+      err.textContent = embed.error;
+      err.hidden = false;
+      return;
+    }
+    setMusic({ url: input.value.trim(), collapsed: false });
+  });
+  return form;
+}
+
+let editingMusic = false;
+
+function renderMusic() {
+  const { music } = state;
+  const body = $('musicBody');
+  const actions = $('musicActions');
+  const embed = music.url ? musicEmbed(music.url, music.tall) : null;
+  $('musicCard').classList.toggle('collapsed', music.collapsed);
+
+  if (!embed || embed.error || editingMusic) {
+    musicSrcShown = null;
+    $('musicTitle').textContent = 'Music';
+    actions.replaceChildren(
+      ...(editingMusic ? [musicAction('Cancel', 'Keep the current link', () => ((editingMusic = false), renderMusic()))] : []),
+    );
+    body.replaceChildren(musicSetupForm(editingMusic ? music.url : ''));
+    return;
+  }
+
+  $('musicTitle').textContent = embed.provider;
+  const popped = music.windowId != null;
+  actions.replaceChildren(
+    ...(popped
+      ? []
+      : [
+          musicAction(music.collapsed ? 'Show' : 'Hide', music.collapsed ? 'Show the player' : 'Shrink to this bar', () =>
+            setMusic({ collapsed: !music.collapsed }),
+          ),
+          ...(music.collapsed
+            ? []
+            : [musicAction(music.tall ? 'Smaller' : 'Track list', music.tall ? 'Compact player' : 'Show the track list', () =>
+                setMusic({ tall: !music.tall }),
+              )]),
+          musicAction('Pop out', 'Open in its own small window so it keeps playing in other tabs', () =>
+            sendMessage({ type: 'music:popout' }),
+          ),
+        ]),
+    musicAction('Change', 'Use a different link', () => {
+      editingMusic = true;
+      renderMusic();
+    }),
+  );
+
+  if (popped) {
+    musicSrcShown = null;
+    const p = document.createElement('p');
+    p.className = 'muted popped';
+    p.textContent = 'Playing in its own window. ';
+    p.append(
+      musicAction('Show it', 'Bring the player window to the front', () => sendMessage({ type: 'music:popout' })),
+      document.createTextNode(' · '),
+      musicAction('Put it back here', 'Close the window and show the player here', () => sendMessage({ type: 'music:popin' })),
+    );
+    body.replaceChildren(p);
+    return;
+  }
+  if (music.collapsed) {
+    // Keep the iframe alive (so music keeps playing) but tuck it away
+    body.querySelector('iframe')?.classList.add('tucked');
+    if (!body.querySelector('iframe')) body.replaceChildren();
+    return;
+  }
+  const existing = body.querySelector('iframe');
+  if (existing && embed.src === musicSrcShown) {
+    existing.classList.remove('tucked');
+    existing.height = String(embed.height);
+    return;
+  }
+  // The track-list toggle only changes height, so reuse the player when the base link is the same
+  if (existing && embed.src.split('?')[0] === musicSrcShown?.split('?')[0]) {
+    existing.classList.remove('tucked');
+    existing.height = String(embed.height);
+    musicSrcShown = embed.src;
+    return;
+  }
+  musicSrcShown = embed.src;
+  body.replaceChildren(musicFrame(embed));
+}
+
+// ---- Quick time-of-day switch in the place picker
+document.querySelectorAll('.segmented [data-tod]').forEach((b) =>
+  b.addEventListener('click', () => saveSettings({ timeOfDay: b.dataset.tod })),
+);
 
 // ---- Sound
 function renderSound() {
@@ -641,7 +889,7 @@ function renderSettings() {
 
   document.querySelectorAll('input[name="blockMode"]').forEach((r) => (r.checked = r.value === s.blockMode));
   for (const id of ['focusMin', 'shortBreakMin', 'longBreakMin', 'longBreakEvery']) {
-    if (document.activeElement !== $(id)) $(id).value = s[id];
+    if (document.activeElement !== $(id)) $(id).value = Number(s[id].toFixed(2));
   }
   $('autoStartBreak').checked = s.autoStartBreak;
   $('timeOfDay').value = s.timeOfDay;
@@ -649,6 +897,7 @@ function renderSettings() {
   $('motion').value = s.motion;
   $('style').value = s.style;
   if (document.activeElement !== $('nameInput')) $('nameInput').value = s.name;
+  $('homeSetting').textContent = s.home.name;
 
   const list = $('siteList');
   list.replaceChildren();
@@ -666,6 +915,11 @@ function renderSettings() {
   }
 }
 
+$('homeChange').addEventListener('click', () => {
+  $('settingsDialog').close();
+  openHomeDialog();
+});
+
 $('settingsBtn').addEventListener('click', () => {
   renderSettings();
   $('settingsDialog').showModal();
@@ -677,7 +931,8 @@ document.querySelectorAll('input[name="blockMode"]').forEach((r) =>
 for (const id of ['focusMin', 'shortBreakMin', 'longBreakMin', 'longBreakEvery']) {
   $(id).addEventListener('change', () => {
     const el = $(id);
-    const v = Math.round(Number(el.value));
+    // Focus length can include seconds when typed into the big timer, so keep decimals there
+    const v = id === 'focusMin' ? Math.round(Number(el.value) * 60) / 60 : Math.round(Number(el.value));
     const min = Number(el.min), max = Number(el.max);
     if (!Number.isFinite(v)) return;
     saveSettings({ [id]: Math.max(min, Math.min(max, v)) });
@@ -724,6 +979,7 @@ function renderAll() {
   renderCountdown();
   renderStats();
   renderSound();
+  renderMusic();
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -732,6 +988,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (k in DEFAULTS) state[k] = deepMerge(DEFAULTS[k], newValue);
   }
   if (changes.settings) {
+    const homeChanged = changes.settings.oldValue?.home?.tz !== changes.settings.newValue?.home?.tz ||
+      changes.settings.oldValue?.home?.name !== changes.settings.newValue?.home?.name;
+    if (homeChanged) {
+      renderClock();
+      renderWeather();
+    }
+    renderTimerTick();
     renderFeatures();
     renderPlace();
     renderControls();
@@ -753,6 +1016,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.journal && $('journalDialog').open) renderJournal();
   if (changes.customPlaces) renderPlace();
+  if (changes.music) {
+    editingMusic = false;
+    renderMusic();
+  }
   if ((changes.customPlaces || changes.settings) && $('placeDialog').open) renderPlaceDialog();
   if (changes.weatherCache) renderWeather();
 });

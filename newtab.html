@@ -14,13 +14,13 @@
 
     <div class="layout">
       <header class="topbar">
-        <div class="clock shadow-text" data-feature="clock">
-          <div class="clock-time" id="homeTime">--:--</div>
-          <div class="clock-sub">
-            <span>Home in Vancouver</span><span id="weather" data-feature="weather"></span>
-          </div>
-          <div class="clock-here" id="hereTime" hidden></div>
-        </div>
+        <button class="clock shadow-text" id="homeBtn" data-feature="clock" title="Change where home is">
+          <span class="clock-time" id="homeTime">--:--</span>
+          <span class="clock-sub">
+            <span id="homeLabel">Home in Vancouver</span><span id="weather" data-feature="weather"></span>
+          </span>
+          <span class="clock-here" id="hereTime" hidden></span>
+        </button>
 
         <nav class="actions">
           <button class="pill" id="placeBtn" title="Choose a place">
@@ -43,7 +43,11 @@
         <p class="greeting shadow-text" id="greeting" data-feature="timer"></p>
         <section class="timer" data-feature="timer" aria-live="polite">
           <div class="phase shadow-text" id="phaseLabel">Ready to lock in</div>
-          <div class="time shadow-text" id="timeLeft">25:00</div>
+          <div class="time-wrap">
+            <button class="time shadow-text" id="timeLeft" title="Click to type a new time">25:00</button>
+            <input class="time shadow-text" id="timeInput" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="New time, like 25, 45:00, or 1h30" hidden />
+          </div>
+          <div class="time-hint shadow-text" id="timeHint" hidden>Type minutes (45), mm:ss (12:30), or 1h30, then press Enter</div>
           <div class="progress" aria-hidden="true"><div id="progressBar"></div></div>
           <div class="controls" id="controls"></div>
           <div class="block-note shadow-text" id="blockNote"></div>
@@ -56,7 +60,14 @@
       </main>
 
       <footer class="bottom">
-        <div class="col">
+        <div class="col left">
+          <section class="card music" id="musicCard" data-feature="music">
+            <h2>
+              <span id="musicTitle">Music</span>
+              <span class="music-actions" id="musicActions"></span>
+            </h2>
+            <div id="musicBody"></div>
+          </section>
           <section class="card todos" data-feature="todos">
             <h2>Today's goals <button class="link-btn" id="clearDone" hidden>Clear done</button></h2>
             <ul id="todoList"></ul>
@@ -70,18 +81,18 @@
 
         <div class="col right">
           <section class="card countdown" data-feature="countdown">
-            <h2><span id="tripLabel">Trip home</span> <button class="link-btn" id="tripEdit">Edit</button></h2>
+            <h2><span id="tripLabel">Return home</span> <button class="link-btn" id="tripEdit">Edit</button></h2>
             <div id="tripView">
               <div class="big" id="tripDays">-</div>
-              <div class="muted" id="tripSub">Set the date of your next trip home.</div>
+              <div class="muted" id="tripSub">Add the date you're going home.</div>
             </div>
             <form id="tripForm" hidden>
-              <input type="text" id="tripLabelInput" maxlength="40" placeholder="Flight home to YVR" aria-label="Trip name" />
+              <input type="text" id="tripLabelInput" maxlength="40" placeholder="Return home" aria-label="Trip name" />
               <div class="row trip-when">
-                <input type="date" id="tripDateInput" aria-label="Departure date" />
-                <input type="time" id="tripTimeInput" aria-label="Departure time" />
+                <input type="date" id="tripDateInput" aria-label="Date" />
+                <input type="time" id="tripTimeInput" aria-label="Time" />
               </div>
-              <small class="muted">Departure time in your local time. Time is optional.</small>
+              <small class="muted">Time is optional, in your local time.</small>
               <div class="row"><button class="btn small primary" type="submit">Save</button><button class="btn small ghost" type="button" id="tripCancel">Cancel</button></div>
             </form>
           </section>
@@ -103,6 +114,12 @@
       <header>
         <h3>Where do you want to be?</h3>
         <div class="header-right">
+          <div class="segmented" role="radiogroup" aria-label="Time of day">
+            <button type="button" role="radio" data-tod="auto" title="Match the time at home">Now</button>
+            <button type="button" role="radio" data-tod="day">Day</button>
+            <button type="button" role="radio" data-tod="dusk">Dusk</button>
+            <button type="button" role="radio" data-tod="night">Night</button>
+          </div>
           <div class="segmented" role="radiogroup" aria-label="Art style">
             <button type="button" role="radio" data-style="smooth">Smooth</button>
             <button type="button" role="radio" data-style="pixel">Pixel art</button>
@@ -115,6 +132,19 @@
       <div class="place-grid" id="customGrid"></div>
       <p class="error" id="photoError" hidden></p>
       <input type="file" id="photoInput" accept="image/*" hidden />
+    </dialog>
+
+    <!-- Home location -->
+    <dialog id="homeDialog" class="sheet">
+      <header><h3>Where's home?</h3><button class="icon-btn close" data-close aria-label="Close">×</button></header>
+      <p class="muted">The clock, the weather, and the scene's time of day will follow this city.</p>
+      <form id="homeForm" class="row" autocomplete="off">
+        <input type="text" id="homeInput" maxlength="80" placeholder="Search for a city" aria-label="City" />
+        <button class="btn small primary" type="submit">Search</button>
+      </form>
+      <p class="muted" id="homeStatus" aria-live="polite"></p>
+      <ul class="city-list" id="homeResults"></ul>
+      <p class="small-print muted">Current: <span id="homeCurrent"></span></p>
     </dialog>
 
     <!-- Sound mixer -->
@@ -149,6 +179,9 @@
           <h4>Show on my new tab</h4>
           <div id="featureToggles" class="checks"></div>
           <label class="field"><span>Your name (optional)</span><input type="text" id="nameInput" maxlength="30" /></label>
+          <div class="field"><span>Home</span>
+            <div class="row home-row"><span id="homeSetting"></span><button class="btn small" type="button" id="homeChange">Change</button></div>
+          </div>
         </section>
 
         <section>
@@ -170,7 +203,7 @@
         <section>
           <h4>Focus timer</h4>
           <div class="nums">
-            <label class="field"><span>Focus (min)</span><input type="number" id="focusMin" min="1" max="180" /></label>
+            <label class="field"><span>Focus (min)</span><input type="number" id="focusMin" min="1" max="600" step="any" /></label>
             <label class="field"><span>Short break</span><input type="number" id="shortBreakMin" min="1" max="60" /></label>
             <label class="field"><span>Long break</span><input type="number" id="longBreakMin" min="1" max="90" /></label>
             <label class="field"><span>Long break every</span><input type="number" id="longBreakEvery" min="1" max="12" /></label>
@@ -181,7 +214,7 @@
           <div class="nums">
             <label class="field"><span>Time of day</span>
               <select id="timeOfDay">
-                <option value="auto">Match Vancouver right now</option>
+                <option value="auto">Match home right now</option>
                 <option value="day">Day</option>
                 <option value="dusk">Dusk</option>
                 <option value="night">Night</option>
@@ -189,7 +222,7 @@
             </label>
             <label class="field"><span>Weather</span>
               <select id="weatherFx">
-                <option value="auto">Match Vancouver right now</option>
+                <option value="auto">Match home right now</option>
                 <option value="rain">Rain</option>
                 <option value="clear">Clear</option>
                 <option value="fog">Fog</option>
