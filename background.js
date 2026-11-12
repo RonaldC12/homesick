@@ -2,6 +2,7 @@
 // the toolbar badge, and the offscreen document that plays ambient sound.
 import {
   DEFAULTS,
+  OLD_TRIP_LABELS,
   getState,
   setState,
   dayKey,
@@ -24,6 +25,10 @@ chrome.runtime.onInstalled.addListener(async () => {
     if (existing[k] === undefined) missing[k] = v;
   }
   if (Object.keys(missing).length) await setState(missing);
+  // The trip card used to default to "Flight home to YVR"; anyone who never renamed it gets the new default.
+  if (existing.settings && OLD_TRIP_LABELS.includes(existing.settings.tripLabel)) {
+    await setState({ settings: { ...existing.settings, tripLabel: DEFAULTS.settings.tripLabel } });
+  }
   await resync();
 });
 
@@ -105,6 +110,29 @@ async function resumeTimer() {
 }
 
 /** Stop early. Focus time already spent still counts toward today's minutes. */
+/**
+ * Typed into the big timer. While idle this sets the focus length;
+ * during a session it changes how much time is left in it.
+ */
+async function setTimer(ms) {
+  const clamped = Math.max(1000, Math.min(ms, 10 * 3_600_000));
+  const { timer, settings } = await getState(['timer', 'settings']);
+  if (timer.phase === 'idle') {
+    await setState({ settings: { ...settings, focusMin: clamped / 60_000 } });
+    return timer;
+  }
+  // Total = time already spent + the new time left, so stats and the progress bar stay honest
+  const elapsed = Math.max(0, timer.totalMs - timerRemainingMs(timer));
+  const totalMs = elapsed + clamped;
+  const next = timer.paused
+    ? { ...timer, remainingMs: clamped, totalMs }
+    : { ...timer, endsAt: Date.now() + clamped, totalMs };
+  await setState({ timer: next });
+  await scheduleAlarms(next);
+  await updateBadge();
+  return next;
+}
+
 async function stopTimer() {
   const { timer } = await getState(['timer']);
   if (timer.phase === 'focus') {
@@ -315,6 +343,46 @@ async function syncAudio(audio) {
 }
 
 // ---------------------------------------------------------------------------
+// Music player window: a small separate window, so music keeps playing
+// while you work in other tabs.
+// ---------------------------------------------------------------------------
+
+async function popOutMusic() {
+  const { music } = await getState(['music']);
+  if (music.windowId != null) {
+    try {
+      await chrome.windows.update(music.windowId, { focused: true });
+      return music;
+    } catch {
+      // It was closed; open a new one below
+    }
+  }
+  const win = await chrome.windows.create({
+    url: chrome.runtime.getURL('player.html'),
+    type: 'popup',
+    width: 360,
+    height: music.tall ? 470 : 260,
+    focused: true,
+  });
+  const next = { ...music, windowId: win.id };
+  await setState({ music: next });
+  return next;
+}
+
+async function popInMusic() {
+  const { music } = await getState(['music']);
+  if (music.windowId != null) await chrome.windows.remove(music.windowId).catch(() => {});
+  const next = { ...music, windowId: null };
+  await setState({ music: next });
+  return next;
+}
+
+chrome.windows.onRemoved.addListener(async (id) => {
+  const { music } = await getState(['music']);
+  if (music.windowId === id) await setState({ music: { ...music, windowId: null } });
+});
+
+// ---------------------------------------------------------------------------
 // Messages from pages
 // ---------------------------------------------------------------------------
 
@@ -324,6 +392,9 @@ const handlers = {
   'timer:resume': resumeTimer,
   'timer:stop': stopTimer,
   'timer:skip': skipPhase,
+  'timer:set': (msg) => setTimer(Number(msg.ms)),
+  'music:popout': popOutMusic,
+  'music:popin': popInMusic,
   'offscreen:ready': async () => (await getState(['audio'])).audio,
   'audio:status': async () => {
     if (!(await hasOffscreen())) return { state: 'none' };
